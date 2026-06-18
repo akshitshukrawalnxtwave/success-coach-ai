@@ -1,5 +1,5 @@
 import streamlit as st
-from agent.ai import generate_response
+from ai import generate_response
 from sheets import db
 
 # ======================================================
