@@ -1,4 +1,5 @@
 import gspread
+import streamlit as st
 from google.oauth2.service_account import Credentials
 
 SCOPES = [
@@ -7,7 +8,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_file(
-    "credentials.json",
+    st.secrets["gcp_service_account"],
     scopes=SCOPES
 )
 
