@@ -17,6 +17,7 @@ def get_student_scores(student_id: str):
 @tool
 def get_student_attendance(student_id: str):
     """Get attendance information for a student"""
+    print(db.get_student_attendance(student_id))
     return db.get_student_attendance(student_id)
 
 

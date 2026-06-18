@@ -1,6 +1,7 @@
 # Ignore folders
 venv/
 __pycache__/
+.streamlit/
 
 # Ignore files
 .env

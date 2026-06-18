@@ -56,15 +56,16 @@ class Database:
     
     def get_student_attendance(self, student_id):
         """Returns the attendance of the student with the given student_id"""
+        attendance_records = []
         for record in self.attendance_data:
             if record.get('student_id') == student_id:
-                return {
+                attendance_records.append({
                     'attendance_pct': record.get('attendance_pct'),
                     'week_of': record.get('week_of'),
                     'classes_attended': record.get('classes_attended'),
                     'classes_scheduled': record.get('classes_scheduled')
-                }
-        return None
+                })
+        return attendance_records
     
     def get_exams_schedule(self, student_id):
         """Returns the exam schedule of the student with the given student_id"""
