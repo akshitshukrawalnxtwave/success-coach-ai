@@ -1,0 +1,14 @@
+# Ignore folders
+agent/
+venv/
+__pycache__/
+
+# Ignore files
+.env
+credentials.json
+sheets.py
+prevChat.py
+tool.py
+
+# Keep only these
+# (main.py and ai.py will remain tracked)
