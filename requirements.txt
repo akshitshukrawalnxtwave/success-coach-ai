@@ -2,8 +2,11 @@ streamlit
 python-dotenv
 langchain
 langchain-openai
+langchain-community
 openai
 google-auth-oauthlib
 google-auth-httplib2
 google-api-python-client
 gspread
+chromadb
+langchain-text-splitters

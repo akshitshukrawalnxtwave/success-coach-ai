@@ -7,9 +7,10 @@ def get_student_details(student_id: str):
     """Get basic details for a student"""
     return db.get_student_details(student_id)
 
-def get_all_student_details(student_id: str):
-    """Get all details for a student"""
-    return db.get_all_students(student_id)
+@tool
+def get_all_student_details():
+    """Return a compact list of all students"""
+    return db.get_all_students()
 
 
 @tool
@@ -21,7 +22,6 @@ def get_student_scores(student_id: str):
 @tool
 def get_student_attendance(student_id: str):
     """Get attendance information for a student"""
-    print(db.get_student_attendance(student_id))
     return db.get_student_attendance(student_id)
 
 

@@ -1,12 +1,13 @@
 from dotenv import load_dotenv
 
 from agent.prevChat import fetch_previous_chat
+from agent.rag import get_rag_context
 from agent.tool import (
     get_student_details,
     get_student_scores,
     get_student_attendance,
     get_exam_schedule,
-    get_all_student_details
+    get_all_student_details,
 )
 
 from langchain_openai import ChatOpenAI
@@ -30,6 +31,7 @@ tools = [
     get_student_attendance,
     get_exam_schedule,
     get_all_student_details,
+    get_rag_context,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -40,6 +42,7 @@ tool_map = {
     "get_student_attendance": get_student_attendance,
     "get_exam_schedule": get_exam_schedule,
     "get_all_student_details": get_all_student_details,
+    "get_rag_context": get_rag_context,
 }
 
 
@@ -112,12 +115,22 @@ Ask for clarification.
 
 Use tools only when required.
 
+KNOWLEDGE BASE RULES(rag context):
+- If the user asks:
+  • learning portal
+  • program information
+  • policies
+  • documentation
+  • URLs
+  • academy information
+  • anything not found in student tools
+
 TOOLS:
 
 1. get_student_details
     - Purpose: Return the roster record for a student.
     - Input: `student_id` (string)
-    - Output: dict of roster fields (e.g., `student_id`, `name`, ...)
+    - Output: dict of roster fields (e.g., `student_id`, `name`, `program`, `cohort`, `manager_email`)
 
 2. get_student_scores
     - Purpose: Return exam score entries for a student.
@@ -139,6 +152,11 @@ TOOLS:
     - Input: None
     - Output: list of dicts with keys: `id`, `name`.
     - Note: `db.get_all_students()` expects no arguments; the tool wrapper should not require `student_id`.
+
+6. get_rag_context
+    - Purpose: Retrieve knowledge base context from the RAG document.
+    - Input: `query` (string), optionally `k` (int)
+    - Output: formatted extracted content from the knowledge base.
 
 
 RULES:
@@ -192,13 +210,21 @@ ROLE:
     messages.append(ai_msg)
 
     # Execute tools
+    student_tool_names = {
+        "get_student_details",
+        "get_student_scores",
+        "get_student_attendance",
+        "get_exam_schedule",
+    }
+
     for tool_call in ai_msg.tool_calls:
 
         tool_name = tool_call["name"]
         args = tool_call.get("args", {})
 
-        # Inject student id automatically
-        args["student_id"] = student_id
+        # Inject student id automatically only for student-scoped tools
+        if tool_name in student_tool_names:
+            args["student_id"] = student_id
 
         try:
             result = tool_map[
@@ -219,6 +245,7 @@ ROLE:
         )
 
     # Final response
-    final = llm.invoke(messages)
+    final = llm_with_tools.invoke(messages)
+    return final.content
 
     return final.content
