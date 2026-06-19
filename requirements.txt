@@ -11,3 +11,4 @@ gspread
 chromadb
 langchain-text-splitters
 langchain-chroma
+mem0ai

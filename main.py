@@ -1,11 +1,7 @@
 import streamlit as st
 from ai import generate_response
+from agent.prevChat import end_session
 from sheets import db
-
-# ======================================================
-# PLACEHOLDERS (you will implement these)
-# ======================================================
-
 
 # ======================================================
 # APP CONFIG
@@ -16,13 +12,11 @@ st.set_page_config(
     layout="wide"
 )
 
-
 # ======================================================
 # SAMPLE STUDENTS
 # ======================================================
 
 students = db.get_all_students()
-
 
 # ======================================================
 # SIDEBAR
@@ -42,10 +36,8 @@ with st.sidebar:
             students,
             format_func=lambda x: x["name"]
         )
-        # Store selected student in session state for Coach view
         st.session_state["selected_student"] = selected_student
     else:
-        # In Coach view, use the previously selected student
         if "selected_student" not in st.session_state:
             selected_student = students[0] if students else None
         else:
@@ -53,23 +45,33 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("End Session"):
-        st.session_state.pop("messages", None)
+    if st.button("🔴 End Session", use_container_width=True):
+        student_id = selected_student["id"]
+        session_key = f"messages_{student_id}_{view}"
+
+        # Save current session to Mem0
+        end_session(
+            session_key=session_key,
+            student_id=student_id
+        )
+
+        # Clear Streamlit chat history for this session
+        st.session_state.pop(session_key, None)
+
+        st.success("Session saved!")
         st.rerun()
 
 
 student_id = selected_student["id"]
 
-
 # ======================================================
-# LOAD CHAT HISTORY
+# CHAT KEY — unique per student + view
 # ======================================================
 
 chat_key = f"messages_{student_id}_{view}"
 
 if chat_key not in st.session_state:
     st.session_state[chat_key] = []
-
 
 # ======================================================
 # HEADER
@@ -81,16 +83,13 @@ with left:
     if view == "Coach":
         st.title("Coach View")
     else:
-        st.title(
-            f"{view} View — {selected_student['name']}"
-        )
+        st.title(f"{view} View — {selected_student['name']}")
 
 with right:
     st.metric(
         "Messages",
         len(st.session_state[chat_key])
     )
-
 
 # ======================================================
 # CHAT HISTORY
@@ -102,7 +101,6 @@ with chat_container:
     for msg in st.session_state[chat_key]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-
 
 # ======================================================
 # CHAT INPUT
@@ -117,37 +115,30 @@ placeholder = (
 prompt = st.chat_input(placeholder)
 
 if prompt:
-    # Append user message to session state
     st.session_state[chat_key].append({
         "role": "user",
         "content": prompt
     })
 
-    # Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    role_type = (
-        "student"
-        if view == "Student"
-        else "coach"
-    )
+    role_type = "student" if view == "Student" else "coach"
 
+    # Pass session_key so ai.py tracks the right session
     response = generate_response(
         student_id=student_id,
         message=prompt,
-        type=role_type
+        type=role_type,
+        session_key=chat_key        # <-- new param
     )
 
-    # Append assistant response to session state
     st.session_state[chat_key].append({
         "role": "assistant",
         "content": response
     })
 
-    # Display assistant response
     with st.chat_message("assistant"):
         st.markdown(response)
 
-    # Rerun to update chat history
     st.rerun()

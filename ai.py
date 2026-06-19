@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 
-from agent.prevChat import fetch_previous_chat
+from agent.prevChat import fetch_previous_chat, get_session, append_to_session
 from agent.rag import get_rag_context
 from agent.tool import (
     get_student_details,
@@ -22,7 +22,7 @@ load_dotenv()
 
 llm = ChatOpenAI(
     model="gpt-5.4-mini-2026-03-17",
-    temperature=0.3,   # lower = less random
+    temperature=0.3,
 )
 
 tools = [
@@ -46,45 +46,31 @@ tool_map = {
 }
 
 
-def build_history_messages(history):
-    """
-    Convert stored chat history into LangChain messages.
-
-    Expected format:
-    [
-        {"role":"user","content":"Hi"},
-        {"role":"assistant","content":"Hello"}
-    ]
-    """
-
+def build_history_messages(history, max_messages=10):
+    """Convert stored chat history into LangChain messages."""
     messages = []
-
     if not history:
         return messages
 
-    for item in history:
-
+    for item in history[-max_messages:]:
         if isinstance(item, dict):
-
             role = item.get("role")
             content = item.get("content", "")
-
             if role == "user":
                 messages.append(HumanMessage(content=content))
-
             elif role == "assistant":
                 messages.append(AIMessage(content=content))
-
-        elif isinstance(item, str):
-            # fallback if old format
-            messages.append(HumanMessage(content=item))
 
     return messages
 
 
-def generate_response(student_id, message, type):
+def generate_response(student_id, message, type, session_key):
 
-    history = fetch_previous_chat(student_id)
+    # Long-term memory from previous sessions (Mem0)
+    past_history = fetch_previous_chat(student_id)
+
+    # Current session messages (in-memory)
+    current_session = get_session(session_key)
 
     role_instruction = {
         "student": """
@@ -92,7 +78,6 @@ You are a helpful tutor.
 Explain simply.
 Encourage improvement.
 """,
-
         "coach": """
 You are a student success coach.
 Give actionable academic guidance.
@@ -109,14 +94,12 @@ IMPORTANT:
 
 Assume every message is coming from this student whose student_id is {student_id}.
 
-only handle queries related to academics, attendance, and exams, else say it is out of my scope.
-
-Ask for clarification.
+Only handle queries related to academics, attendance, and exams, else say it is out of my scope.
 
 Use tools only when required.
 
-KNOWLEDGE BASE RULES(rag context):
-- If the user asks:
+KNOWLEDGE BASE RULES (rag context):
+- Use get_rag_context tool if the user asks about:
   • learning portal
   • program information
   • policies
@@ -129,87 +112,82 @@ TOOLS:
 
 1. get_student_details
     - Purpose: Return the roster record for a student.
-    - Input: `student_id` (string)
-    - Output: dict of roster fields (e.g., `student_id`, `name`, `program`, `cohort`, `manager_email`)
+    - Input: student_id (string)
+    - Output: dict of roster fields (e.g., student_id, name, program, cohort, manager_email)
 
 2. get_student_scores
     - Purpose: Return exam score entries for a student.
-    - Input: `student_id` (string)
-    - Output: list of dicts with keys: `subject`, `score`, `max_score`, `date`.
+    - Input: student_id (string)
+    - Output: list of dicts with keys: subject, score, max_score, date.
 
 3. get_student_attendance
     - Purpose: Return attendance records for a student.
-    - Input: `student_id` (string)
-    - Output: list of dicts with keys: `attendance_pct`, `week_of`, `classes_attended`, `classes_scheduled`.
+    - Input: student_id (string)
+    - Output: list of dicts with keys: attendance_pct, week_of, classes_attended, classes_scheduled.
 
 4. get_exam_schedule
     - Purpose: Return upcoming exam entries for a student.
-    - Input: `student_id` (string)
-    - Output: list of dicts with keys: `subject`, `exam_date`, `exam_type`.
+    - Input: student_id (string)
+    - Output: list of dicts with keys: subject, exam_date, exam_type.
 
 5. get_all_student_details
     - Purpose: Return a compact list of all students.
     - Input: None
-    - Output: list of dicts with keys: `id`, `name`.
-    - Note: `db.get_all_students()` expects no arguments; the tool wrapper should not require `student_id`.
+    - Output: list of dicts with keys: id, name.
 
 6. get_rag_context
     - Purpose: Retrieve knowledge base context from the RAG document.
-    - Input: `query` (string), optionally `k` (int)
+    - Input: query (string), optionally k (int)
     - Output: formatted extracted content from the knowledge base.
-
 
 RULES:
 
-- Never invent attendance.
-- Never invent scores.
-- Never invent exam dates.
+- Never invent attendance, scores, or exam dates.
 - Convert tool output into natural language.
 - Never show raw JSON.
 - Use student's actual name.
-
+- Use conversation history to understand follow-up messages.
 
 ATTENTION CHECK:
 
-After answering:
-
-Flag:
+After answering, flag if:
 - attendance below 75%
-- upcoming exam (< 7 days)
+- upcoming exam in less than 7 days
 - low score
 
-If nothing stands out:
-say performance looks stable.
-
+If nothing stands out, say performance looks stable.
 
 ROLE:
 {role_instruction}
 """
 
-    messages = [
-        SystemMessage(content=system_prompt)
-    ]
+    messages = [SystemMessage(content=system_prompt)]
 
-    # Add previous conversation properly
-    messages.extend(
-        build_history_messages(history)
-    )
+    # 1. Long-term memory from Mem0 (previous sessions)
+    if past_history:
+        messages.append(SystemMessage(content="Context from previous sessions:"))
+        messages.extend(build_history_messages(past_history))
 
-    # Current message only
-    messages.append(
-        HumanMessage(content=message)
-    )
+    # 2. Current session messages (full continuity within session)
+    messages.extend(build_history_messages(current_session, max_messages=50))
 
-    # First pass
+    # 3. Current user message
+    messages.append(HumanMessage(content=message))
+
+    # First LLM pass
     ai_msg = llm_with_tools.invoke(messages)
 
-    # If no tool needed
+    # If no tool call needed
     if not ai_msg.tool_calls:
+        append_to_session(session_key, [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": ai_msg.content},
+        ])
         return ai_msg.content
 
     messages.append(ai_msg)
 
-    # Execute tools
+    # Execute all tool calls
     student_tool_names = {
         "get_student_details",
         "get_student_scores",
@@ -218,24 +196,16 @@ ROLE:
     }
 
     for tool_call in ai_msg.tool_calls:
-
         tool_name = tool_call["name"]
         args = tool_call.get("args", {})
 
-        # Inject student id automatically only for student-scoped tools
         if tool_name in student_tool_names:
             args["student_id"] = student_id
 
         try:
-            result = tool_map[
-                tool_name
-            ].invoke(args)
-
+            result = tool_map[tool_name].invoke(args)
         except Exception as e:
-
-            result = (
-                f"Tool error: {str(e)}"
-            )
+            result = f"Tool error: {str(e)}"
 
         messages.append(
             ToolMessage(
@@ -244,8 +214,14 @@ ROLE:
             )
         )
 
-    # Final response
+    # Final LLM pass
     final = llm_with_tools.invoke(messages)
-    return final.content
+    response_text = final.content
 
-    return final.content
+    # Save to current session only (not Mem0 yet)
+    append_to_session(session_key, [
+        {"role": "user", "content": message},
+        {"role": "assistant", "content": response_text},
+    ])
+
+    return response_text
