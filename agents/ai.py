@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 
-from agent.prevChat import fetch_previous_chat, get_session, append_to_session
-from agent.rag import get_rag_context
-from agent.tool import (
+from utils.prevChat import fetch_previous_chat, get_session, append_to_session
+from utils.rag import get_rag_context
+from utils.tool import (
     get_student_details,
     get_student_scores,
     get_student_attendance,

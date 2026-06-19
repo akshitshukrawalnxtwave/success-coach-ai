@@ -15,7 +15,7 @@ print("=" * 60)
 
 try:
     print("\n[1/4] Importing RAG modules...")
-    from agent.rag import (
+    from utils.rag import (
         RAG,
         RAG_DOCUMENT_PATH,
     )

@@ -1,5 +1,5 @@
 from langchain.tools import tool
-from sheets import db
+from utils.sheets import db
 
 
 @tool
@@ -29,3 +29,8 @@ def get_student_attendance(student_id: str):
 def get_exam_schedule(student_id: str):
     """Get upcoming exam schedule for a student"""
     return db.get_exams_schedule(student_id)
+
+@tool
+def save_signal(student_id: str, signal_type: str, severity: int, urgency: int, reason: str, timestamp: str, actioned: bool):
+    """Save a signal for a student"""
+    return db.save_signal(student_id, signal_type, severity, urgency, reason, timestamp, actioned)

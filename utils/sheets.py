@@ -22,6 +22,7 @@ roster = spreadsheet.worksheet("roster")
 attendance = spreadsheet.worksheet("attendance")
 exam_scores = spreadsheet.worksheet("exam_scores")
 exam_schedule = spreadsheet.worksheet("exam_schedule")
+signal_sheet = spreadsheet.worksheet("signal_sheet")
 
 
 class Database:
@@ -33,6 +34,7 @@ class Database:
         self.attendance_data = attendance.get_all_records()
         self.exam_scores_data = exam_scores.get_all_records()
         self.exam_schedule_data = exam_schedule.get_all_records()
+        self.signal_data = signal_sheet.get_all_records()
     
     def get_student_details(self, student_id):
         """Returns the details of the student with the given student_id"""
@@ -96,6 +98,36 @@ class Database:
             'attendance': self.get_student_attendance(student_id),
             'upcoming_exams': self.get_exams_schedule(student_id)
         }
+    
+    def save_signal(self, student_id, signal_type, severity, urgency, reason, timestamp, actioned):
+        """Save a signal to the signal_sheet"""
+        new_signal = [
+            student_id,
+            signal_type,
+            severity,
+            urgency,
+            reason,
+            timestamp,
+            actioned
+        ]
+        try:
+            signal_sheet.append_row(new_signal)
+            # Add to in-memory data
+            self.signal_data.append({
+                'student_id': student_id,
+                'signal_type': signal_type,
+                'severity': severity,
+                'urgency': urgency,
+                'reason': reason,
+                'timestamp': timestamp,
+                'actioned': actioned
+            })
+            print(f"Signal saved for student {student_id}")
+            return True
+        except Exception as e:
+            print(f"Error saving signal: {e}")
+            return False
+        
 
 
 # Initialize database instance

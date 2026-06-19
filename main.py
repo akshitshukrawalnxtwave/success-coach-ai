@@ -1,7 +1,8 @@
 import streamlit as st
-from ai import generate_response
-from agent.prevChat import end_session
-from sheets import db
+from agents.ai import generate_response
+from agents.signalagent import analyze_session_for_signal
+from utils.prevChat import end_session
+from utils.sheets import db
 
 # ======================================================
 # APP CONFIG
@@ -48,6 +49,24 @@ with st.sidebar:
     if st.button("🔴 End Session", use_container_width=True):
         student_id = selected_student["id"]
         session_key = f"messages_{student_id}_{view}"
+        
+        # Get current session messages
+        session_messages = st.session_state.get(session_key, [])
+        
+        # Analyze session for signals (requires human intervention)
+        signal_data = analyze_session_for_signal(student_id, view, session_messages)
+        
+        # Create signal if needed
+        if signal_data:
+            db.save_signal(
+                student_id=student_id,
+                signal_type=signal_data["signal_type"],
+                severity=signal_data["severity"],
+                urgency=signal_data["urgency"],
+                reason=signal_data["reason"],
+                timestamp=signal_data["timestamp"],
+                actioned=signal_data["actioned"]
+            )
 
         # Save current session to Mem0
         end_session(
