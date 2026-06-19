@@ -6,6 +6,7 @@ from agent.tool import (
     get_student_scores,
     get_student_attendance,
     get_exam_schedule,
+    get_all_student_details
 )
 
 from langchain_openai import ChatOpenAI
@@ -28,6 +29,7 @@ tools = [
     get_student_scores,
     get_student_attendance,
     get_exam_schedule,
+    get_all_student_details,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -37,6 +39,7 @@ tool_map = {
     "get_student_scores": get_student_scores,
     "get_student_attendance": get_student_attendance,
     "get_exam_schedule": get_exam_schedule,
+    "get_all_student_details": get_all_student_details,
 }
 
 
@@ -101,30 +104,41 @@ student_id = {student_id}
 
 IMPORTANT:
 
-Assume every message refers to THIS student
-unless the user explicitly mentions another student.
+Assume every message is coming from this student whose student_id is {student_id}.
 
-If user says things like:
-- attendance
-- marks
-- scores
-- exams
-- performance
-- progress
-- concerns
-- schedule
-- how am I doing
+only handle queries related to academics, attendance, and exams, else say it is out of my scope.
 
-DO NOT ask for clarification.
+Ask for clarification.
 
-Use tools immediately.
+Use tools only when required.
 
 TOOLS:
 
 1. get_student_details
+    - Purpose: Return the roster record for a student.
+    - Input: `student_id` (string)
+    - Output: dict of roster fields (e.g., `student_id`, `name`, ...)
+
 2. get_student_scores
+    - Purpose: Return exam score entries for a student.
+    - Input: `student_id` (string)
+    - Output: list of dicts with keys: `subject`, `score`, `max_score`, `date`.
+
 3. get_student_attendance
+    - Purpose: Return attendance records for a student.
+    - Input: `student_id` (string)
+    - Output: list of dicts with keys: `attendance_pct`, `week_of`, `classes_attended`, `classes_scheduled`.
+
 4. get_exam_schedule
+    - Purpose: Return upcoming exam entries for a student.
+    - Input: `student_id` (string)
+    - Output: list of dicts with keys: `subject`, `exam_date`, `exam_type`.
+
+5. get_all_student_details
+    - Purpose: Return a compact list of all students.
+    - Input: None
+    - Output: list of dicts with keys: `id`, `name`.
+    - Note: `db.get_all_students()` expects no arguments; the tool wrapper should not require `student_id`.
 
 
 RULES:

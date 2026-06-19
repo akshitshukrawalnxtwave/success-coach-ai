@@ -7,6 +7,10 @@ def get_student_details(student_id: str):
     """Get basic details for a student"""
     return db.get_student_details(student_id)
 
+def get_all_student_details(student_id: str):
+    """Get all details for a student"""
+    return db.get_all_students(student_id)
+
 
 @tool
 def get_student_scores(student_id: str):
