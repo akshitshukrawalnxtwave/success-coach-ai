@@ -14,6 +14,7 @@ from utils.tool import (
     get_all_student_details,
 )
 from agents.generatePlan import add_event_to_calendar, generate_plan
+from agents.preMeetingBrief import get_pre_meeting_brief
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import (
@@ -172,14 +173,16 @@ coach_tools = [
     StructuredTool.from_function(generate_plan),
     StructuredTool.from_function(get_student_history),
     StructuredTool.from_function(get_action_plan),
+    StructuredTool.from_function(get_pre_meeting_brief),
     StructuredTool.from_function(add_event_to_calendar),
 ]
 
 coach_tool_map = {
-    "generate_plan":         generate_plan,
-    "get_student_history":   get_student_history,
-    "get_action_plan":       get_action_plan,
-    "add_event_to_calendar": add_event_to_calendar,
+    "generate_plan":           generate_plan,
+    "get_student_history":     get_student_history,
+    "get_action_plan":         get_action_plan,
+    "get_pre_meeting_brief":   get_pre_meeting_brief,
+    "add_event_to_calendar":   add_event_to_calendar,
 }
 
 
@@ -196,13 +199,16 @@ You are a student success coach assistant. Your job is to help the coach manage 
 efficiently and act on student signals.
 
 TOOLS YOU HAVE:
-1. generate_plan       — Builds today's prioritised coaching schedule, slots students 2–6 PM,
-                         defers overflow to tomorrow, and auto-creates Google Calendar events.
-2. get_student_history — Returns full academic history, attendance, scores and past interactions
-                         for a specific student. Requires student_id.
-3. get_action_plan     — Returns a recommended action checklist for a student based on their
-                         active signal type. Requires student_id.
-4. add_event_to_calendar — Manually adds a single coaching session to Google Calendar.
+1. generate_plan         — Builds today's prioritised coaching schedule, slots students 2–6 PM,
+                           defers overflow to tomorrow, and auto-creates Google Calendar events.
+2. get_student_history   — Returns full academic history, attendance, scores and past interactions
+                           for a specific student. Requires student_id.
+3. get_action_plan       — Returns a recommended action checklist for a student based on their
+                           active signal type. Requires student_id.
+4. get_pre_meeting_brief — Returns a focused pre-meeting brief for a student before a coaching
+                           session. Covers current academic situation, changes since last session,
+                           open concerns, and conversation starters. Requires student_id or name.
+5. add_event_to_calendar — Manually adds a single coaching session to Google Calendar.
                            Requires student_id, event_type, date (YYYY-MM-DD), slot_index (0-3).
 
 WHEN TO CALL EACH TOOL:
@@ -210,6 +216,8 @@ WHEN TO CALL EACH TOOL:
   "today's schedule", "start my day" → call generate_plan immediately, no further questions.
 - User asks about a specific student's background, history, or performance → call get_student_history.
 - User asks what to do with / for a student → call get_action_plan.
+- User asks for a pre-meeting brief, prep, talking points, conversation starters, or what to
+  discuss before meeting a student → call get_pre_meeting_brief with that student's id or name.
 - User wants to manually book a session → call add_event_to_calendar.
 
 RULES:
@@ -244,25 +252,11 @@ RULES:
         args      = tool_call.get("args", {})
 
         try:
-            # #region agent log
-            import json, time
-            with open("/home/nxtwave/Desktop/Success Coach AI/.cursor/debug-4b78b9.log", "a") as _f:
-                _f.write(json.dumps({"sessionId": "4b78b9", "timestamp": int(time.time() * 1000), "location": "ai.py:coach_response", "message": "tool_call_start", "data": {"tool_name": tool_name, "args": args}, "hypothesisId": "C"}) + "\n")
-            # #endregion
             if args:
                 result = coach_tool_map[tool_name](**args)
             else:
                 result = coach_tool_map[tool_name]()
-            # #region agent log
-            with open("/home/nxtwave/Desktop/Success Coach AI/.cursor/debug-4b78b9.log", "a") as _f:
-                _f.write(json.dumps({"sessionId": "4b78b9", "timestamp": int(time.time() * 1000), "location": "ai.py:coach_response", "message": "tool_call_ok", "data": {"tool_name": tool_name, "result_preview": str(result)[:200]}, "hypothesisId": "E"}) + "\n")
-            # #endregion
         except Exception as e:
-            # #region agent log
-            import traceback
-            with open("/home/nxtwave/Desktop/Success Coach AI/.cursor/debug-4b78b9.log", "a") as _f:
-                _f.write(json.dumps({"sessionId": "4b78b9", "timestamp": int(time.time() * 1000), "location": "ai.py:coach_response", "message": "tool_call_error", "data": {"tool_name": tool_name, "error_type": type(e).__name__, "error": str(e), "traceback": traceback.format_exc()}, "hypothesisId": "A,B,C,D,E"}) + "\n")
-            # #endregion
             result = f"Tool error: {str(e)}"
 
         messages.append(ToolMessage(content=str(result), tool_call_id=tool_call["id"]))

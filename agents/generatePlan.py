@@ -10,16 +10,6 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
-# #region agent log
-def _agent_log(location, message, data=None, hypothesis_id=""):
-    import json, time
-    try:
-        with open("/home/nxtwave/Desktop/Success Coach AI/.cursor/debug-4b78b9.log", "a") as f:
-            f.write(json.dumps({"sessionId": "4b78b9", "timestamp": int(time.time() * 1000), "location": location, "message": message, "data": data or {}, "hypothesisId": hypothesis_id}) + "\n")
-    except Exception:
-        pass
-# #endregion
-
 # Fixed time slots: 2pm to 6pm (4 slots x 1 hour each)
 MEETING_SLOTS = ["14:00", "15:00", "16:00", "17:00"]
 
@@ -136,14 +126,8 @@ def generate_plan():
     signal as actioned so they don't reappear in future plans.
     """
     print("Generating daily coaching plan...")
-    # #region agent log
-    _agent_log("generatePlan.py:generate_plan", "entry", {}, "A")
-    # #endregion
     all_signals = db.get_signals()
     unactioned = [s for s in all_signals if str(s.get('actioned')).strip() == 'No']
-    # #region agent log
-    _agent_log("generatePlan.py:generate_plan", "signals_loaded", {"total": len(all_signals), "unactioned": len(unactioned), "student_ids": [s.get("student_id") for s in unactioned[:5]]}, "A")
-    # #endregion
 
     if not unactioned:
         return "No pending signals. All students are on track."
@@ -175,9 +159,6 @@ def generate_plan():
 
     for idx, sig in enumerate(today_signals):
         student    = db.get_student_details(sig.get('student_id'))
-        # #region agent log
-        _agent_log("generatePlan.py:generate_plan", "student_lookup", {"idx": idx, "student_id": sig.get("student_id"), "found": student is not None}, "A")
-        # #endregion
         slot_label = MEETING_SLOTS[idx]
         slot_end   = f"{int(slot_label[:2]) + 1}:00"
         student_name = (
@@ -202,9 +183,6 @@ def generate_plan():
             date=today_date,
             slot_index=idx
         )
-        # #region agent log
-        _agent_log("generatePlan.py:generate_plan", "calendar_result", {"idx": idx, "result_type": type(cal_result).__name__, "keys": list(cal_result.keys()) if isinstance(cal_result, dict) else None, "success": cal_result.get("success") if isinstance(cal_result, dict) else None}, "B,D")
-        # #endregion
         calendar_results.append(cal_result)
 
         # Mark signal as actioned so it won't reappear tomorrow
@@ -233,7 +211,4 @@ def generate_plan():
         if r.get("event_link"):
             plan += f"     {r['event_link']}\n"
 
-    # #region agent log
-    _agent_log("generatePlan.py:generate_plan", "success", {"plan_len": len(plan)}, "A")
-    # #endregion
     return plan
