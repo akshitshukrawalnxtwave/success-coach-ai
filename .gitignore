@@ -3,10 +3,12 @@ venv/
 __pycache__/
 .streamlit/
 chroma_db/
+.cursor/
 
 # Ignore files
 .env
 credentials.json
+
 
 # Keep only these
 # (main.py and ai.py will remain tracked)

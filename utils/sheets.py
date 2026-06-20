@@ -27,7 +27,7 @@ signal_sheet = spreadsheet.worksheet("signal_sheet")
 
 class Database:
     """Database class to manage all student data from Google Sheets"""
-    
+
     def __init__(self):
         """Fetch all data from sheets on initialization"""
         self.roster_data = roster.get_all_records()
@@ -35,14 +35,14 @@ class Database:
         self.exam_scores_data = exam_scores.get_all_records()
         self.exam_schedule_data = exam_schedule.get_all_records()
         self.signal_data = signal_sheet.get_all_records()
-    
+
     def get_student_details(self, student_id):
         """Returns the details of the student with the given student_id"""
         for record in self.roster_data:
             if record.get('student_id') == student_id:
                 return record
         return None
-    
+
     def get_student_scores(self, student_id):
         """Returns the scores of the student with the given student_id"""
         scores = []
@@ -55,7 +55,7 @@ class Database:
                     'date': record.get('date')
                 })
         return scores
-    
+
     def get_student_attendance(self, student_id):
         """Returns the attendance of the student with the given student_id"""
         attendance_records = []
@@ -68,7 +68,7 @@ class Database:
                     'classes_scheduled': record.get('classes_scheduled')
                 })
         return attendance_records
-    
+
     def get_exams_schedule(self, student_id):
         """Returns the exam schedule of the student with the given student_id"""
         exams = []
@@ -80,7 +80,7 @@ class Database:
                     'exam_type': record.get('exam_type')
                 })
         return exams
-    
+
     def get_all_students(self):
         """Fetch all students from roster"""
         students = []
@@ -90,7 +90,7 @@ class Database:
                 'name': record.get('name')
             })
         return students
-    
+
     def get_student_info(self, student_id):
         """Get comprehensive student data"""
         return {
@@ -98,7 +98,7 @@ class Database:
             'attendance': self.get_student_attendance(student_id),
             'upcoming_exams': self.get_exams_schedule(student_id)
         }
-    
+
     def save_signal(self, student_id, signal_type, severity, urgency, reason, timestamp, actioned):
         """Save a signal to the signal_sheet"""
         new_signal = [
@@ -127,7 +127,52 @@ class Database:
         except Exception as e:
             print(f"Error saving signal: {e}")
             return False
-        
+
+    def get_signals(self):
+        """Fetch all signals from signal_sheet"""
+        return self.signal_data
+
+    def mark_signal_actioned(self, student_id):
+        """
+        Mark the first unactioned signal for a student as 'Yes' in both
+        the Google Sheet and in-memory data.
+        """
+        try:
+            for idx, record in enumerate(self.signal_data):
+                if (
+                    record.get('student_id') == student_id
+                    and str(record.get('actioned')).strip() == 'No'
+                ):
+                    # Rows in the sheet: row 1 = header, data starts at row 2
+                    sheet_row = idx + 2
+                    # Column 7 = 'actioned' (matches save_signal column order)
+                    signal_sheet.update_cell(sheet_row, 7, 'Yes')
+                    # Mirror update in-memory
+                    self.signal_data[idx]['actioned'] = 'Yes'
+                    print(f"Signal marked actioned for student {student_id}")
+                    return True
+
+            print(f"No unactioned signal found for student {student_id}")
+            return False
+        except Exception as e:
+            print(f"Error marking signal actioned: {e}")
+            return False
+
+    def delete_signal(self, student_id):
+        """Delete a signal from the signal_sheet based on student_id"""
+        try:
+            for idx, record in enumerate(self.signal_data):
+                if record.get('student_id') == student_id:
+                    # +2: header row offset + 0-based index
+                    signal_sheet.delete_row(idx + 2)
+                    self.signal_data.pop(idx)
+                    print(f"Signal deleted for student {student_id}")
+                    return True
+            print(f"No matching signal found for student {student_id}")
+            return False
+        except Exception as e:
+            print(f"Error deleting signal: {e}")
+            return False
 
 
 # Initialize database instance
