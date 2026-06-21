@@ -1,6 +1,7 @@
 import streamlit as st
 from agents.ai import generate_response
 from agents.signalagent import analyze_session_for_signal
+from agents.generatePlan import replan_for_urgent_signal   # M9
 from utils.prevChat import end_session
 from utils.sheets import db
 
@@ -47,31 +48,43 @@ with st.sidebar:
     st.divider()
 
     if st.button("🔴 End Session", use_container_width=True):
-        student_id = selected_student["id"]
+        student_id  = selected_student["id"]
         session_key = f"messages_{student_id}_{view}"
-        
+
         # Get current session messages
         session_messages = st.session_state.get(session_key, [])
-        
+
         # Analyze session for signals (requires human intervention)
         signal_data = analyze_session_for_signal(student_id, view, session_messages)
-        
-        # Create signal if needed
+
+        # ── M9: save signal then replan if high priority ──────────────────
         if signal_data:
-            db.save_signal(
-                student_id=student_id,
-                signal_type=signal_data["signal_type"],
-                severity=signal_data["severity"],
-                urgency=signal_data["urgency"],
-                reason=signal_data["reason"],
-                timestamp=signal_data["timestamp"],
-                actioned=signal_data["actioned"]
+            saved = db.save_signal(
+                student_id  = student_id,
+                signal_type = signal_data["signal_type"],
+                severity    = signal_data["severity"],
+                urgency     = signal_data["urgency"],
+                reason      = signal_data["reason"],
+                timestamp   = signal_data["timestamp"],
+                actioned    = signal_data["actioned"]
             )
+
+            if saved and (
+                signal_data.get("urgency")  == "High"
+                or signal_data.get("severity") == "High"
+            ):
+                replan_result = replan_for_urgent_signal(
+                    new_student_id = student_id,
+                    new_signal     = signal_data
+                )
+
+                # Store replan result so it surfaces in Coach view
+                st.session_state["replan_alert"] = replan_result
 
         # Save current session to Mem0
         end_session(
-            session_key=session_key,
-            student_id=student_id
+            session_key = session_key,
+            student_id  = student_id
         )
 
         # Clear Streamlit chat history for this session
@@ -111,6 +124,38 @@ with right:
     )
 
 # ======================================================
+# M9 — REPLAN ALERT (Coach view only)
+# ======================================================
+
+if view == "Coach" and "replan_alert" in st.session_state:
+    alert = st.session_state["replan_alert"]
+    action = alert.get("action")
+
+    if action == "booked":
+        st.success(alert["message"])
+
+    elif action == "bumped":
+        st.warning(alert["message"])
+
+    elif action == "conflict":
+        st.error(alert["message"])
+        # Surface conflict details as a structured table
+        if alert.get("conflict_students"):
+            st.markdown("**Conflict breakdown:**")
+            st.table(alert["conflict_students"])
+
+    elif action == "already_scheduled":
+        st.info(alert["message"])
+
+    elif action == "error":
+        st.error(alert["message"])
+
+    # Dismiss button — clears the alert once coach has seen it
+    if st.button("✅ Dismiss alert"):
+        del st.session_state["replan_alert"]
+        st.rerun()
+
+# ======================================================
 # CHAT HISTORY
 # ======================================================
 
@@ -144,12 +189,11 @@ if prompt:
 
     role_type = "student" if view == "Student" else "coach"
 
-    # Pass session_key so ai.py tracks the right session
     response = generate_response(
-        student_id=student_id,
-        message=prompt,
-        type=role_type,
-        session_key=chat_key        # <-- new param
+        student_id  = student_id,
+        message     = prompt,
+        type        = role_type,
+        session_key = chat_key
     )
 
     st.session_state[chat_key].append({

@@ -1,3 +1,5 @@
+from datetime import date
+
 import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
@@ -23,6 +25,7 @@ attendance = spreadsheet.worksheet("attendance")
 exam_scores = spreadsheet.worksheet("exam_scores")
 exam_schedule = spreadsheet.worksheet("exam_schedule")
 signal_sheet = spreadsheet.worksheet("signal_sheet")
+events = spreadsheet.worksheet("events")
 
 
 class Database:
@@ -35,6 +38,7 @@ class Database:
         self.exam_scores_data = exam_scores.get_all_records()
         self.exam_schedule_data = exam_schedule.get_all_records()
         self.signal_data = signal_sheet.get_all_records()
+        self.events_data = events.get_all_records()
 
     def get_student_details(self, student_id):
         """Returns the details of the student with the given student_id"""
@@ -173,7 +177,71 @@ class Database:
         except Exception as e:
             print(f"Error deleting signal: {e}")
             return False
+    
+    def get_sessions_by_date(self, date):
+        return [
+            row
+            for row in self.events_data
+            if str(row.get("session_date")) == date
+        ]
+    
+    def is_student_scheduled(self, student_id, date):
+        for row in self.events_data:
+            if (
+                row.get("student_id") == student_id
+                and row.get("session_date") == date
+                and row.get("status") in ["planned", "completed"]
+            ):
+                return True
+        return False
 
+    def save_session(
+        self,
+        session_id,
+        student_id,
+        session_date,
+        slot_time,
+        signal_type,
+        status="planned"
+    ):
+        row = [
+            session_id,
+            student_id,
+            session_date,
+            slot_time,
+            signal_type,
+            status
+        ]
+
+        events.append_row(row)
+
+        self.events_data.append({
+            "session_id": session_id,
+            "student_id": student_id,
+            "session_date": session_date,
+            "slot_time": slot_time,
+            "signal_type": signal_type,
+            "status": status
+        })
+
+        return True
+
+    def get_free_slots(self, date, all_slots):
+
+        occupied = {
+            str(row["slot_time"])
+            for row in self.events_data
+            if (
+                row["session_date"] == date
+                and row["status"] in ["planned", "completed"]
+            )
+        }
+
+        return [
+            slot
+            for slot in all_slots
+            if slot not in occupied
+        ]
 
 # Initialize database instance
 db = Database()

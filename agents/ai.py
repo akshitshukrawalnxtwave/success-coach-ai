@@ -209,7 +209,8 @@ TOOLS YOU HAVE:
                            session. Covers current academic situation, changes since last session,
                            open concerns, and conversation starters. Requires student_id or name.
 5. add_event_to_calendar — Manually adds a single coaching session to Google Calendar.
-                           Requires student_id, event_type, date (YYYY-MM-DD), slot_index (0-3).
+   Requires student_id, event_type, date (YYYY-MM-DD), slot (24hr HH:MM format, e.g. '15:00').
+   Valid slots: '14:00', '15:00', '16:00', '17:00'.
 
 WHEN TO CALL EACH TOOL:
 - User says anything like "show my plan", "what's today", "generate plan", "who do I meet",
